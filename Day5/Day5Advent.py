@@ -1,53 +1,109 @@
-from collections import defaultdict
+from collections import defaultdict, deque
 
+def split_string(s: str, delimiter: str) -> list:
+    return s.split(delimiter)
 
-# Part 1 Code
-def p1():
-    with open('/Users/emreersahin/Desktop/Advent-of-Code-2024/Day5/Day5Advent.txt', 'r') as file:
-        updates = False
-        rule_dict = defaultdict(set)
-        update_arr = []
-        for line in file:
-            if line.strip() == "":
-                updates = True
-                continue
-            # Adding to rule dict
-            if not updates:
-                rule_dict[line[3:].strip()].add(line[:2])
-            # Adding to update matrix
-            if updates:
-                update_arr.append(line.strip().split(','))
+def p1(update: list, rules: list) -> int:
+    # Map each element to its position in the update list
+    positions = {value: idx for idx, value in enumerate(update)}
     
-    # RULE DICT: Every number mapped to a set of every number that should proceed it
-    # UPDATE ARRAY: Every update represented as an array of string numbers
+    # Check each rule to ensure dependencies are met
+    for a, b in rules:
+        if a in positions and b in positions:
+            if positions[a] > positions[b]:
+                # Dependency violated: 'a' comes after 'b'
+                return 0
+    
+    # If all dependencies are satisfied, return the middle value
+    if not update:
+        return 0  # Handle empty list case
+    return update[len(update) // 2]
 
-    res = 0
-    # Iterate through every update, if everything valid then add middle number to res, otherwise continue
-    for update in update_arr:
-        update_count = len(update)
-        valid = True
-        for i in range(len(update)-1, -1, -1):
-            # Early Stop
-            if not valid:
-                break
-            if i == 0 and valid:
-                res += int(update[update_count // 2])
-                break
-            # Check rest of indices to see if inside set
-            for j in range(i-1, -1, -1):
-                if valid and update[j] not in rule_dict[update[i]]:
-                    valid = False
-    return res
+def p2(update: list, rules: list) -> int:
+    # First, check if the current update satisfies all dependencies
+    mid_p1 = p1(update, rules)
+    if mid_p1 > 0:
+        # Dependencies are already satisfied; no correction needed
+        return 0
+    
+    # Build the dependency graph: key -> set of dependents
+    graph = defaultdict(set)
+    in_degree = defaultdict(int)
+    elements = set(update)
+    
+    for a, b in rules:
+        if a in elements and b in elements:
+            graph[b].add(a)  # 'b' must come before 'a'
+            in_degree[a] += 1  # 'a' has one more prerequisite
+    
+    # Initialize queue with nodes having in-degree 0 (no prerequisites)
+    queue = deque([elem for elem in update if in_degree[elem] == 0])
+    
+    sorted_order = []
+    while queue:
+        current = queue.popleft()
+        sorted_order.append(current)
+        
+        for dependent in graph[current]:
+            in_degree[dependent] -= 1
+            if in_degree[dependent] == 0:
+                queue.append(dependent)
+    
+    # Check if topological sort was successful
+    if len(sorted_order) != len(elements):
+        # Cycle detected or unresolved dependencies
+        return 0
+    
+    # Find and return the middle value of the sorted list
+    middle_index = len(sorted_order) // 2
+    return sorted_order[middle_index]
 
-#def p2():
+def solution(rules: list, updates: list):
+    total_p2 = 0
+    for idx, update in enumerate(updates, 1):
+        middle_p1 = p1(update, rules)
+        
+        middle_p2 = p2(update, rules)
+        
+        # Aggregate the result for p2
+        total_p2 += middle_p2
+    print(total_p2)
+    return total_p2
 
-
+def read_input(file_path: str) -> tuple:
+    rules = []
+    updates = []
+    with open(file_path, 'r') as file:
+        # Read rules until an empty line is encountered
+        for line in file:
+            line = line.strip()
+            if not line:
+                break  # Empty line signifies end of rules
+            parts = split_string(line, '|')
+            if len(parts) == 2:
+                a, b = int(parts[0]), int(parts[1])
+                rules.append((a, b))
+        
+        # Read updates after the empty line
+        for line in file:
+            line = line.strip()
+            if not line:
+                continue  # Skip empty lines
+            parts = split_string(line, ',')
+            update = [int(part) for part in parts]
+            updates.append(update)
+    
+    return rules, updates
 
 def main():
-    print(p1())
-    #print(p2())
-
+    # Update the file path to your actual input file location
+    input_file = '/Users/emreersahin/Desktop/Advent-of-Code-2024/Day5/Day5Advent.txt'
+    rules, updates = read_input(input_file)
+    
+    # Process updates and compute the result using both p1 and p2
+    solution(rules, updates)
+    
+    return 0
 
 if __name__ == "__main__":
     main()
-
